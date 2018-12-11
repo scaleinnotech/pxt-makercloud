@@ -1,0 +1,15 @@
+{
+    "name": "Makercloud",
+    "version": "1.0.0",
+    "description": "Add Wi-Fi connectivity to micro:bit and start your IoT project in 5 minutes!",
+    "license": "MIT",
+    "dependencies": {
+        "core": "*"
+    },
+    "files": [
+        "mc.ts"
+    ],
+    "testFiles": [],
+    "public": false,
+    "installedVersion": "workspace:73ce7fb8-dd92-44a5-7dfa-b6786be24649"
+}
