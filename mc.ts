@@ -127,7 +127,8 @@ namespace Makercloud_Dfrobot {
         let i = 0
         for (i = 0; i < topicHandlerList.length; i++) {
             if (topicHandlerList[i].name == topic) {
-                topicHandlerList[i].fn(message)
+                let content: string = extractContentFromMakerCloudMessage(message)
+                topicHandlerList[i].fn(content)
                 break
             }
         }
@@ -164,6 +165,29 @@ namespace Makercloud_Dfrobot {
         }
 
         return messages
+    }
+
+    function extractContentFromMakerCloudMessage(makerCloudMessage:string): string {
+
+        let delimitor = ","
+        let numberOfDelimitorToSkip = 2
+        let numberOfDelimitorSkipped = 0
+        let content = ""
+        let i = 0
+        for (i = 0; i < makerCloudMessage.length; i++) {
+            let letter: string = makerCloudMessage.charAt(i)
+
+
+            if (numberOfDelimitorSkipped >= numberOfDelimitorToSkip) {
+                content += letter
+            }
+
+            if (letter == delimitor) {
+                numberOfDelimitorSkipped++
+            }
+        }
+        return content;
+
     }
 
     function splitMessageOnFirstDelimitor(message: string, delimitor: string): string[] {
