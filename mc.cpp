@@ -3,7 +3,7 @@ using namespace pxt;
 namespace MakerCloud {
 
     //%
-    void obloqSetTxBufferSize(int size){
+    void setTxBufferSize(int size){
         if(size > 100) {
             size = 100;
         }
@@ -11,7 +11,7 @@ namespace MakerCloud {
     }
 
     //%
-    void obloqSetRxBufferSize(int size){
+    void setRxBufferSize(int size){
         if(size > 100) {
             size = 100;
         }
