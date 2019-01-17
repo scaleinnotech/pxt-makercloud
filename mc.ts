@@ -6,16 +6,40 @@ namespace Makercloud_Dfrobot {
     let SIT_SERVER = "mqtt.makercloud-sit.scaleinnotech.com"
     let SERVER = PROD_SERVER
 
-    let topicHandlerList: TopicHandler[] = []
+    let stringMessageHandlerList: StringMessageHandler[] = []
+    let keyValueMessageHandlerList: KeyValueMessageHandler[] = []
 
-    export class TopicHandler {
-        name: string;
-        fn: (message: string) => void;
+    export class StringMessageHandler {
+        topicName: string;
+        fn: (stringMessage: string) => void;
     }
 
-    export class TopicMessage {
-        name: string;
-        message: string;
+    export class KeyValueMessageHandler {
+        topicName: string;
+        fn: (key: string, value: string) => void;
+    }
+
+    export class KeyValueMessage {
+        key: string;
+        value: string;
+    }
+
+    export class MakerCloudMessage {
+        deviceName: string;
+        deviceSerialNumber: string;
+        rawMessage: string;
+        stringMessageList: string[];
+        keyValueMessagList: KeyValueMessage[];
+    }
+
+    //% advanced=true shim=MakerCloud::setTxBufferSize
+    function setTxBufferSize(size: number): void {
+        return
+    }
+
+    //% advanced=true shim=MakerCloud::setRxBufferSize
+    function setRxBufferSize(size: number): void {
+        return
     }
 
     /**
@@ -26,6 +50,7 @@ namespace Makercloud_Dfrobot {
     //% block="connect Wi-Fi: | name: %ssid| password: %password"
     export function setupWifi(ssid: string, password: string) {
         serial.writeString("|2|1|" + ssid + "," + password + "|\r")
+        showLoading(7000)
     }
 
     /**
@@ -49,6 +74,54 @@ namespace Makercloud_Dfrobot {
         SERIAL_RX = rx
     }
 
+    export function showLoading(time: number) {
+        let internal = time / 5;
+        basic.showLeds(`
+            # . . . .
+            . . . . .
+            . . . . .
+            . . . . .
+            . . . . .
+            `)
+        basic.pause(internal)
+
+        basic.showLeds(`
+            # # . . .
+            . . . . .
+            . . . . .
+            . . . . .
+            . . . . .
+            `)
+        basic.pause(internal)
+
+        basic.showLeds(`
+            # # . . .
+            . . . . .
+            . . . . .
+            . . . . .
+            . . . . .
+            `)
+        basic.pause(internal)
+
+        basic.showLeds(`
+            # # # . .
+            . . . . .
+            . . . . .
+            . . . . .
+            . . . . .
+            `)
+        basic.pause(internal)
+
+        basic.showLeds(`
+            # # # # #
+            . . . . .
+            . . . . .
+            . . . . .
+            . . . . .
+            `)
+        basic.pause(internal)
+        basic.showString("")
+    }
 
     /**
      * @param topic ,eg: "topic"
@@ -60,6 +133,7 @@ namespace Makercloud_Dfrobot {
     export function publishToTopic(topic: string, message: string) {
         message = "_dsn=" + control.deviceSerialNumber() + ",_dn=" + control.deviceName() + "," + message
         serial.writeString("|4|1|3|" + topic + "|" + message + "|\r");
+        showLoading(1000);
     }
 
     /**
@@ -70,6 +144,7 @@ namespace Makercloud_Dfrobot {
     export function connectMqtt() {
         let port = 1883;
         serial.writeString("|4|1|1|" + SERVER + "|" + port + "|" + "username" + "|" + "password" + "|\r")
+        showLoading(1000);
     }
 
     /**
@@ -77,14 +152,14 @@ namespace Makercloud_Dfrobot {
      * @param topics to topics ,eg: "ZXY,ABC"
      */
     //% blockId=mc_df_subscribe_topic
-    //% block="i want to listen %topics"
+    //% block="i want to listen to %topics"
     export function subscrbeTopic(topics: string) {
         let topicList = splitMessage(topics, ",")
         let i = 0
         for (i = 0; i < topicList.length; i++) {
-            "" + control.deviceSerialNumber() + control.deviceName()
             if (topicList[i] != "") {
                 serial.writeString("|4|1|2|" + topicList[i] + "|\r")
+                showLoading(500);
             }
         }
     }
@@ -93,14 +168,28 @@ namespace Makercloud_Dfrobot {
      * Listener for MQTT topic
      * @param topic to topic ,eg: "ZXY"
      */
-    //% blockId=mc_df_register_topic_message_handler
+    //% blockId=mc_df_register_topic_text_message_handler
     //% block="When something talk to %topic, then"
-    export function registerTopicMessageHandler(topic: string, fn: (message: string) => void) {
-        let topicHandler = new TopicHandler()
+    export function registerTopicMessageHandler(topic: string, fn: (textMessage: string) => void) {
+        let topicHandler = new StringMessageHandler()
         topicHandler.fn = fn
-        topicHandler.name = topic
-        topicHandlerList.push(topicHandler)
+        topicHandler.topicName = topic
+        stringMessageHandlerList.push(topicHandler)
     }
+
+    /**
+     * Listener for MQTT topic
+     * @param topic to topic ,eg: "ZXY"
+     */
+    //% blockId=mc_df_register_topic_key_value_message_handler
+    //% block="When something talk to %topic, then"
+    export function registerTopicKeyValueMessageHandler(topic: string, fn: (key: string, value: string) => void) {
+        let topicHandler = new KeyValueMessageHandler()
+        topicHandler.fn = fn
+        topicHandler.topicName = topic
+        keyValueMessageHandlerList.push(topicHandler)
+    }
+
 
     /**
      * @param SSID to SSID ,eg: "yourSSID"
@@ -116,19 +205,38 @@ namespace Makercloud_Dfrobot {
             SERIAL_RX,
             BaudRate.BaudRate9600
         )
+
+        setTxBufferSize(300)
+        setRxBufferSize(300)
         ping()
         ping()
         ping()
 
+        showLoading(500)
         serial.onDataReceived("\r", onDataReceivedHandler)
     }
 
-    function handleTopicMessage(topic: string, message: string) {
+    function handleTopicStringMessage(topic: string, stringMessageList: string[]) {
         let i = 0
-        for (i = 0; i < topicHandlerList.length; i++) {
-            if (topicHandlerList[i].name == topic) {
-                let content: string = extractContentFromMakerCloudMessage(message)
-                topicHandlerList[i].fn(content)
+        for (i = 0; i < stringMessageHandlerList.length; i++) {
+            if (stringMessageHandlerList[i].topicName == topic) {
+                let j = 0;
+                for (j = 0; j < stringMessageList.length; j++) {
+                    stringMessageHandlerList[i].fn(stringMessageList[j]);
+                }
+                break
+            }
+        }
+    }
+
+    function handleTopicKeyValueMessage(topic: string, keyValueMessageList: KeyValueMessage[]) {
+        let i = 0
+        for (i = 0; i < keyValueMessageHandlerList.length; i++) {
+            if (keyValueMessageHandlerList[i].topicName == topic) {
+                let j = 0;
+                for (j = 0; j < keyValueMessageList.length; j++) {
+                    keyValueMessageHandlerList[i].fn(keyValueMessageList[j].key, keyValueMessageList[j].value);
+                }
                 break
             }
         }
@@ -139,9 +247,9 @@ namespace Makercloud_Dfrobot {
         let prefix = response.substr(0, 7)
         if (prefix == "|4|1|5|") {
             let message: string[] = splitMessageOnFirstDelimitor(response.substr(7, response.length - 1), "|")
-            handleTopicMessage(message[0], message[1])
-        } else {
-            // basic.showString("X")
+            let makerCloudMessage = parseMakerCloudMessage(message[1]);
+            handleTopicStringMessage(message[0], makerCloudMessage.stringMessageList)
+            handleTopicKeyValueMessage(message[0], makerCloudMessage.keyValueMessagList)
         }
     }
 
@@ -167,27 +275,80 @@ namespace Makercloud_Dfrobot {
         return messages
     }
 
-    function extractContentFromMakerCloudMessage(makerCloudMessage: string): string {
+    export function parseMakerCloudMessage(topicMessage: string): MakerCloudMessage {
+        let makerCloudMessage = new MakerCloudMessage();
+        makerCloudMessage.rawMessage = topicMessage;
+        makerCloudMessage.deviceName = "";
+        makerCloudMessage.deviceSerialNumber = "";
+        makerCloudMessage.keyValueMessagList = [];
+        makerCloudMessage.stringMessageList = [];
 
-        let delimitor = ","
-        let numberOfDelimitorToSkip = 2
-        let numberOfDelimitorSkipped = 0
-        let content = ""
-        let i = 0
-        for (i = 0; i < makerCloudMessage.length; i++) {
-            let letter: string = makerCloudMessage.charAt(i)
+        let delimitor = ",";
+        let start = 0;
+        let oldMessage: string = topicMessage;
 
-
-            if (numberOfDelimitorSkipped >= numberOfDelimitorToSkip) {
-                content += letter
+        let i = 0;
+        let total = countDelimitor(oldMessage, delimitor);
+        for (i = 0; i <= total; i++) {
+            let end = oldMessage.indexOf(delimitor);
+            if (end == -1) {
+                end = oldMessage.length
             }
+            let subMessage = oldMessage.substr(0, end);
+            if (subMessage.indexOf("=") == -1) {
+                makerCloudMessage.stringMessageList[makerCloudMessage.stringMessageList.length] = subMessage
+            } else {
+                let splitIndex = subMessage.indexOf("=");
+                let key = subMessage.substr(0, splitIndex);
+                let value = subMessage.substr(splitIndex + 1)
 
-            if (letter == delimitor) {
-                numberOfDelimitorSkipped++
+                if (value.length > 0) {
+                    if (key == "_dsn") {
+                        makerCloudMessage.deviceSerialNumber = value;
+                    } else if (key == "_dn") {
+                        makerCloudMessage.deviceName = value;
+                    } else {
+                        let keyValue = new KeyValueMessage();
+                        keyValue.key = key;
+                        keyValue.value = value;
+                        makerCloudMessage.keyValueMessagList[makerCloudMessage.keyValueMessagList.length] = keyValue;
+                    }
+                }
+            }
+            oldMessage = oldMessage.substr(end + 1, oldMessage.length);
+        }
+
+        return makerCloudMessage;
+    }
+
+    export function countDelimitor(msg: string, delimitor: string): number {
+        let count: number = 0;
+        let i = 0;
+        for (i = 0; i < msg.length; i++) {
+            if (msg.charAt(i) == delimitor) {
+                count++;
             }
         }
-        return content;
+        return count;
+    }
 
+    export function test() {
+        let msg = parseMakerCloudMessage("_dsn=446565559,_dn=tagot,a");
+        serial.writeLine("deviceName=" + msg.deviceName)
+        serial.writeLine("deviceSerialNumber=" + msg.deviceSerialNumber)
+        serial.writeLine("rawMessage=" + msg.rawMessage)
+        serial.writeLine("keyValueMessagList.length=" + msg.keyValueMessagList.length)
+        serial.writeLine("stringMessageList.length=" + msg.stringMessageList.length)
+        let i = 0;
+        for (i = 0; i < msg.keyValueMessagList.length; i++) {
+            serial.writeLine("keyValueMessagList:" + i + ", key=" + msg.keyValueMessagList[i].key + ",value=" + msg.keyValueMessagList[i].value);
+        }
+        i = 0;
+        for (i = 0; i < msg.stringMessageList.length; i++) {
+            serial.writeLine("stringMessageList:" + i + ",value=" + msg.stringMessageList[i]);
+        }
+
+        serial.writeLine("end");
     }
 
     function splitMessageOnFirstDelimitor(message: string, delimitor: string): string[] {
