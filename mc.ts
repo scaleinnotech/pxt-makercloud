@@ -133,7 +133,6 @@ namespace Makercloud_Dfrobot {
     export function publishToTopic(topic: string, message: string) {
         message = "_dsn=" + control.deviceSerialNumber() + ",_dn=" + control.deviceName() + "," + message
         serial.writeString("|4|1|3|" + topic + "|" + message + "|\r");
-        showLoading(1000);
     }
 
     /**
@@ -159,7 +158,6 @@ namespace Makercloud_Dfrobot {
         for (i = 0; i < topicList.length; i++) {
             if (topicList[i] != "") {
                 serial.writeString("|4|1|2|" + topicList[i] + "|\r")
-                showLoading(500);
             }
         }
     }
