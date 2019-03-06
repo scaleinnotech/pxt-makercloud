@@ -136,6 +136,19 @@ namespace Makercloud_Dfrobot {
     }
 
     /**
+     * @param topic ,eg: "topic"
+     * @param key ,eg: "key"
+     * @param value ,eg: "value"
+     */
+    //% blockId=mc_df_publish_key_value_message_to_topic
+    //% block="tell %topic about %key = $value"
+    //% advance=true
+    export function publishKeyValueToTopic(topic: string, key: string, value: string) {
+        let message = "_dsn=" + control.deviceSerialNumber() + ",_dn=" + control.deviceName() + "," + key + "=" + value
+        serial.writeString("|4|1|3|" + topic + "|" + message + "|\r");
+    }
+
+    /**
      * Connect your device to MQTT Server
      */
     //% blockId=mc_df_connect_mqtt
